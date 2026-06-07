@@ -2,4 +2,4 @@
 
 ### EL proyecto final lo tengo en un fork; https://github.com/whoamijas0n/IndoorView-documentation.git
 
-### los parciales se hicieron en grupo, los tiene mi compañero de equipo.
+### los parciales se hicieron en grupo, los tiene mi compañero de equipo. https://github.com/JR88GG
