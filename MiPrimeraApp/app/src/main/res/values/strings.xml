@@ -5,11 +5,5 @@
         <item>Resta</item>
         <item>Multiplicacion</item>
         <item>Division</item>
-
-        <item>Factorial</item>
-        <item>Porcentaje</item>
-        <item>Exponenciacion</item>
-        <item>Raiz</item>
     </string-array>
 </resources>
-

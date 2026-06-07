@@ -15,116 +15,108 @@ import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-
-import org.json.JSONObject;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class MainActivity extends Activity {
-    DB db;
+    FloatingActionButton fab;
     Button btn;
     TextView tempVal;
-    String accion="nuevo", idAmigo="", urlFoto="", id="", rev="";
-    Intent tomarFotoIntent;
-    FloatingActionButton fab;
+    String accion="", idAmigo="", id="", rev="";
     ImageView img;
-
+    String urlCompletaFoto="", getUrlCompletaFotoFirestore ="";
+    Intent tomarFotoIntent;
+    detectarinternet di;
+    DatabaseReference databaseReference;
+    String miToken = "";
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        obtenerToken();
         img = findViewById(R.id.imgFotoAmigo);
-        img.setOnClickListener(v->tomarFoto());
-
-        db = new DB(this);
 
         btn = findViewById(R.id.btnGuardarAmigo);
-        btn.setOnClickListener(v->guardarAmigo());
+        btn.setOnClickListener(view -> subirFotoFirestore());
 
-        fab = findViewById(R.id.fabListaAmigo);
-        fab.setOnClickListener(v->regresarListaAmigos());
-
-        mostrarDatosAmigos();
+        //mostrarDatos();
+        tomarFoto();
     }
-    private void mostrarDatosAmigos(){
+    private void obtenerToken(){
         try{
-            Bundle parametros = getIntent().getExtras();
-            accion = parametros.getString("accion");
-            if(accion.equals("modificar")){
-                JSONObject datos = new JSONObject(parametros.getString("amigos"));
-                id = datos.getString("_id");
-                rev = datos.getString("_rev");
-                idAmigo = datos.getString("idAmigo");
-
-                tempVal = findViewById(R.id.txtNombreAmigos);
-                tempVal.setText(datos.getString("nombre"));
-
-                tempVal = findViewById(R.id.txtDireccionAmigos);
-                tempVal.setText(datos.getString("direccion"));
-
-                tempVal = findViewById(R.id.txtTelefonoAmigos);
-                tempVal.setText(datos.getString("telefono"));
-
-                tempVal = findViewById(R.id.txtEmailAmigos);
-                tempVal.setText(datos.getString("email"));
-
-                tempVal = findViewById(R.id.txtDuiAmigos);
-                tempVal.setText(datos.getString("dui"));
-
-                urlFoto = datos.getString("foto");
-                img.setImageURI(Uri.parse(urlFoto));
-            }
+            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(tarea->{
+                if(!tarea.isSuccessful()){
+                    mostrarMsg("Error al obtener token: "+tarea.getException().getMessage());
+                }else{
+                    miToken = tarea.getResult();
+                }
+            });
         }catch (Exception e){
-            mostrarMsg("Error al mostrar los datos: "+ e.getMessage());
+            mostrarMsg("Error al obtener token: "+e.getMessage());
         }
     }
     private void tomarFoto(){
-        tomarFotoIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        File fotoAmigo = null;
-
-        try{
-            fotoAmigo = crearImgAmigo();
-            if(fotoAmigo!=null){
-                Uri uriFoto = FileProvider.getUriForFile(MainActivity.this, "com.ugb.miprimeraapp.fileprovider", fotoAmigo);
-                tomarFotoIntent.putExtra(MediaStore.EXTRA_OUTPUT, uriFoto);
-                startActivityForResult(tomarFotoIntent, 1);
-            }else{
-                mostrarMsg("Nose pudo crear la foto");
+        img.setOnClickListener(view->{
+            tomarFotoIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            File fotoAmigo = null;
+            try{
+                fotoAmigo = crearImagenAmigo();
+                if( fotoAmigo!=null ){
+                    Uri uriFotoAimgo = FileProvider.getUriForFile(MainActivity.this,
+                            "com.ugb.miprimeraapp.fileprovider", fotoAmigo);
+                    tomarFotoIntent.putExtra(MediaStore.EXTRA_OUTPUT, uriFotoAimgo);
+                    startActivityForResult(tomarFotoIntent, 1);
+                }else{
+                    mostrarMsg("Nose pudo crear la imagen.");
+                }
+            }catch (Exception e){
+                mostrarMsg("Error al tomar foto: "+e.getMessage());
             }
-        } catch (Exception e) {
-            mostrarMsg("Error al tomar la foto: "+ e.getMessage());
-        }
+        });
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         try{
-            if(requestCode==1 && resultCode==RESULT_OK){
-                img.setImageURI(Uri.parse(urlFoto));
+            if( requestCode==1 && resultCode==RESULT_OK ){
+                img.setImageURI(Uri.parse(urlCompletaFoto));
             }else{
-                mostrarMsg("No fue posible mostrar la foto");
+                mostrarMsg("No se tomo la foto.");
             }
-        } catch (Exception e) {
-            mostrarMsg("Error en abrir la camara: "+ e.getMessage());
+        }catch (Exception e){
+            mostrarMsg("Error al tomar la foto: "+e.getMessage());
         }
     }
 
-    private File crearImgAmigo() throws Exception{
+    private File crearImagenAmigo() throws Exception{
         String fechaHoraMs = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()),
-                fileMane = "foto_"+ fechaHoraMs;
+                fileName = "imagen_"+ fechaHoraMs+"_";
         File dirAlmacenamiento = getExternalFilesDir(Environment.DIRECTORY_DCIM);
-        if(dirAlmacenamiento.exists()==false){
+        if( dirAlmacenamiento.exists()==false ){
             dirAlmacenamiento.mkdir();
         }
-        File image = File.createTempFile(fileMane, ".jpg", dirAlmacenamiento);
-        urlFoto = image.getAbsolutePath();
+        File image = File.createTempFile(fileName, ".jpg", dirAlmacenamiento);
+        urlCompletaFoto = image.getAbsolutePath();
         return image;
     }
-    private void guardarAmigo(){
+    private void mostrarMsg(String msg){
+        Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
+    }
+    private void abrirVentana(){
+        Intent intent = new Intent(this, lista_amigos.class);
+        startActivity(intent);
+    }
+    private void guardarAmigo() {
         try {
             tempVal = findViewById(R.id.txtNombreAmigos);
             String nombre = tempVal.getText().toString();
@@ -133,7 +125,7 @@ public class MainActivity extends Activity {
             String direccion = tempVal.getText().toString();
 
             tempVal = findViewById(R.id.txtTelefonoAmigos);
-            String tel = tempVal.getText().toString();
+            String telefono = tempVal.getText().toString();
 
             tempVal = findViewById(R.id.txtEmailAmigos);
             String email = tempVal.getText().toString();
@@ -141,46 +133,43 @@ public class MainActivity extends Activity {
             tempVal = findViewById(R.id.txtDuiAmigos);
             String dui = tempVal.getText().toString();
 
-            //guardar datos en la base de datos en local - SQLite
-            String[] datos = {idAmigo, nombre, direccion, tel, email, dui, urlFoto};
-            db.administrar_amigos(accion, datos);
-            //guardar datos en la base de datos CouchDB conWebService y API REST.
-            JSONObject datosAmigos = new JSONObject();
-            if(accion.equals("modificar")){
-                datosAmigos.put("_id", id);
-                datosAmigos.put("_rev", rev);
+            databaseReference = FirebaseDatabase.getInstance().getReference("amigos");
+            String key = databaseReference.push().getKey();
+
+            if( miToken.equals("") || miToken==null ){
+                obtenerToken();
             }
-            datosAmigos.put("idAmigo", idAmigo);
-            datosAmigos.put("nombre", nombre);
-            datosAmigos.put("direccion", direccion);
-            datosAmigos.put("telefono", tel);
-            datosAmigos.put("email", email);
-            datosAmigos.put("dui", dui);
-            datosAmigos.put("foto", urlFoto);
-
-            enviarDatosServidor objEnviarDatosServidor = new enviarDatosServidor(this);
-            String respuesta = objEnviarDatosServidor.execute(datosAmigos.toString(), "POST", utilidades.url_mto).get();
-
-            //tempVal.setText(respuesta);
-
-            JSONObject respuestaJSON = new JSONObject(respuesta);
-            if(respuestaJSON.getBoolean("ok")){
-                id = respuestaJSON.getString("id");
-                rev = respuestaJSON.getString("rev");
-            }else{
-                mostrarMsg("Error: "+ respuestaJSON.getString("msg"));
+            amigos amigo = new amigos(idAmigo, nombre, direccion, telefono, email, dui, urlCompletaFoto, getUrlCompletaFotoFirestore, miToken);
+            if( key!= null ){
+                databaseReference.child(key).setValue(amigo).addOnSuccessListener(success->{
+                    mostrarMsg("Registro guardado con exito.");
+                    abrirVentana();
+                }).addOnFailureListener(failure->{
+                    mostrarMsg("Error al registrar datos: "+failure.getMessage());
+                });
+            } else {
+                mostrarMsg("Error al guardar en firebase.");
             }
-            mostrarMsg("Registro de amigo guardado con exito.");
-            regresarListaAmigos();
-        } catch (Exception e) {
-            mostrarMsg(e.getMessage());
+        }catch (Exception e){
+            mostrarMsg("Error guardar: "+e.getMessage());
         }
     }
-    private void mostrarMsg(String msg){
-        Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
-    }
-    private void regresarListaAmigos(){
-        Intent intent = new Intent(this, lista_amigos.class);
-        startActivity(intent);
+    private void subirFotoFirestore(){
+        mostrarMsg("Subiendo foto a firestore");
+        StorageReference reference = FirebaseStorage.getInstance().getReference();
+        Uri file = Uri.fromFile(new File(urlCompletaFoto));
+        final StorageReference fileRef = reference.child("fotosAmigos/"+file.getLastPathSegment());
+
+        final UploadTask uploadTask = fileRef.putFile(file);
+        uploadTask.addOnSuccessListener(taskSnapshot -> {
+            fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                getUrlCompletaFotoFirestore = uri.toString();
+                guardarAmigo();
+            }).addOnFailureListener(e -> {
+                mostrarMsg("Error al obtener la url de la foto: "+e.getMessage());
+            });
+        }).addOnFailureListener(e -> {
+            mostrarMsg("Error al subir la foto: "+e.getMessage());
+        });
     }
 }

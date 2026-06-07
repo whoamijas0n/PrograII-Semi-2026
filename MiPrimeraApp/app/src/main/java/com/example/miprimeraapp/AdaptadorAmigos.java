@@ -43,7 +43,7 @@ public class AdaptadorAmigos extends BaseAdapter {
     public View getView(int position, View convertView, ViewGroup parent) {
         inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View itemView = inflater.inflate(R.layout.fotos, parent, false);
-        try{
+        try {
             misAmigos = alAmigos.get(position);
 
             TextView tempVal = itemView.findViewById(R.id.lblNombreAdaptador);
@@ -59,7 +59,7 @@ public class AdaptadorAmigos extends BaseAdapter {
             Bitmap bitmap = BitmapFactory.decodeFile(misAmigos.getFoto());
             img.setImageBitmap(bitmap);
         } catch (Exception e) {
-            Toast.makeText(context, "Error: "+ e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(context, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
         return itemView;
     }
